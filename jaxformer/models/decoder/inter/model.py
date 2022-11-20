@@ -255,7 +255,10 @@ class TransformerDecoder:
 
         dp = thread_resources.env.shape['dp']
         mp = thread_resources.env.shape['mp']
-        assert mp == config['tpu_cores']
+        if 'use_cuda' in config and config['use_cuda']:
+            assert mp == len(jax.devices())
+        else:
+            assert mp == config['tpu_cores']
 
 
         ## sharding

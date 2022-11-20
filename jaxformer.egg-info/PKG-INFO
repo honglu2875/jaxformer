@@ -1,0 +1,10 @@
+Metadata-Version: 2.1
+Name: jaxformer
+Version: 1.0.0
+Summary: Jaxformer
+Home-page: https://github.com/salesforce/jaxformer
+Author: Erik Nijkamp
+Author-email: erik.nijkamp@gmail.com
+License: BSD3
+Keywords: artificial intelligence,deep learning,transformers
+License-File: LICENSE.txt

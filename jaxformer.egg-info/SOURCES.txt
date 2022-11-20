@@ -1,0 +1,8 @@
+LICENSE.txt
+README.md
+setup.py
+jaxformer.egg-info/PKG-INFO
+jaxformer.egg-info/SOURCES.txt
+jaxformer.egg-info/dependency_links.txt
+jaxformer.egg-info/requires.txt
+jaxformer.egg-info/top_level.txt

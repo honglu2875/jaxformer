@@ -50,20 +50,24 @@ class LocalMaster:
 
 
 def create_master(config):
+    
+    if 'use_cuda' in config and config['use_cuda']:
+        mp = len(jax.devices())
+        mesh_shape = (1, 1, mp)
+    else:
+        tpu_size_logical = config['tpu_size_logical']
+        tpu_cores = config['tpu_cores']
+        rep = config['opt_params_partitions']
 
-    tpu_size_logical = config['tpu_size_logical']
-    tpu_cores = config['tpu_cores']
-    rep = config['opt_params_partitions']
-
-    if config['debug_emulate_tpu_on_cpu']:
-        with print_time(f'Emulating tpu on cpu with {tpu_cores} cores'):
-            emulate_tpu_on_cpu(cores=tpu_cores)
-
-
-    with print_time(f'Creating local worker'):
+        if config['debug_emulate_tpu_on_cpu']:
+            with print_time(f'Emulating tpu on cpu with {tpu_cores} cores'):
+                emulate_tpu_on_cpu(cores=tpu_cores)
+        
         dp = tpu_size_logical // tpu_cores // rep
         mp = tpu_cores
         mesh_shape = (dp, rep, mp)
+
+    with print_time(f'Creating local worker'):
         print(f'mesh_shape={mesh_shape}')
         master = LocalMaster(mesh_shape, config)
 
