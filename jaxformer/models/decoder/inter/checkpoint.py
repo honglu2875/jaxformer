@@ -11,16 +11,19 @@ import jax
 import jax.numpy as jnp
 
 import numpy as np
-
+from pathlib import Path
 from smart_open import open
-
+import os
 from jaxformer.utils import print_time
 
 
 # TODO(enijkamp): for inter-board sharding, we only need to serialize one copy
 def save_ckpt(state, path):
+    path=Path(path)
+    path.mkdir(parents=True, exist_ok=True)
 
     def save_arrays(arrays, fname):
+        os.makedirs(os.path.dirname(fname), exist_ok=True)
         with open(fname, 'wb') as f:
             np.savez(f, *arrays)
 
@@ -67,7 +70,7 @@ def load_ckpt(state_old, path, step_overwrite=None, ignore_optimizer=False):
             ckpt = json.load(f)
 
 
-    assert jax.process_count() == ckpt['process_count']
+    # assert jax.process_count() == ckpt['process_count']
 
     state_new = {
         'step': ckpt['step'] if step_overwrite is None else step_overwrite,
