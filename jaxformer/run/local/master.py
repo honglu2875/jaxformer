@@ -8,6 +8,7 @@ import jax
 
 from jaxformer.utils import print_time, emulate_tpu_on_cpu
 from jaxformer.models.factory import create_model
+from jaxformer.models.decoder.inter.checkpoint import try_save_ckpt as try_save_ckpt_decoder, load_ckpt as load_ckpt_decoder
 
 class LocalMaster:
 
@@ -22,6 +23,8 @@ class LocalMaster:
 
         self.lr_schedule = lr_schedule
         self.model = model
+        self.optimizer=optimizer
+
 
 
     def train(self, data):
@@ -37,11 +40,15 @@ class LocalMaster:
 
 
     def save(self, step, path, wandb_run_id, data_files, data_file, data_batch):
-        pass
+        with print_time(f'Writing ckpt json at step={step}'):
+            with open(f'{path}/ckpt.json', 'w') as f:
+                json.dump({'process_count': int(jax.process_count), 'step': int(step), 'wandb_run_id': wandb_run_id, 'data_files': data_files, 'data_file': data_file, 'data_batch': data_batch}, f)
+        
+        return try_save_ckpt_decoder(self.model.state,path=path)
 
 
     def load(self, path, step=None, ignore_optimizer=False):
-        pass
+        return load_ckpt(state_old=self.model.state,path=path,step_overwrite=step,ignore_optimizer=False)
 
 
     def stats(self):

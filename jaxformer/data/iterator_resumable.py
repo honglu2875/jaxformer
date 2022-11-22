@@ -5,14 +5,14 @@
 
 import itertools
 from pathlib import Path
-
+from glob import glob
 import numpy as np
 import tensorflow as tf
 
 
 def list_files(path):
     is_gcs_path = path.startswith('gs://')
-    filenames = tf.io.gfile.glob(path) if is_gcs_path else [str(p) for p in Path(path).glob(path)]
+    filenames = tf.io.gfile.glob(path) if is_gcs_path else [str(p) for p in glob(path)]
     return sorted(filenames)
 
 

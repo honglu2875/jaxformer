@@ -30,7 +30,7 @@ def save_ckpt(state, path):
     with print_time(f'Saving opt in {path}'):
         save_arrays(jax.tree_flatten(state['opt'])[0],  f'{path}/opt/{jax.process_index()}.npz')
 
-    return int(state['step']), int(jax.process_count())
+    return int(state['step'])
 
 
 def try_save_ckpt(state, path, attempts=3):
