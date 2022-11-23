@@ -8,6 +8,7 @@ It supports multiprecessing (better if you let the number of threads to be less 
 
 import lm_dataformat as lmd
 from absl import flags, app
+from util import unravel, get_files
 from pathlib import Path
 from tqdm import tqdm
 import multiprocessing as mp
@@ -24,39 +25,6 @@ flags.DEFINE_integer('threads', 1, 'The number of threads.')
 flags.DEFINE_string('target_format', 'lm', 'The target format (lm, json)')
 
 
-def get_files(input_path):
-    supported_file_types = ['jsonl.zst']
-    
-    if isinstance(input_path, str):
-        input_path = Path(input_path)
-    
-    if input_path.is_dir():
-        # get all files with supported file types
-        files = [list(Path(input_path).glob(f"*{ft}")) for ft in supported_file_types]
-        # flatten list
-        files = [f for sublist in files for f in sublist]
-        assert files, f"No files with supported types found in directory: {input_path}"
-    elif input_path.is_file():
-        assert any(
-            str(input_path).endswith(f_type) for f_type in supported_file_types
-        ), f"Input file type must be one of: {supported_file_types}"
-        files = [input_path]
-    else:
-        raise FileNotFoundError(f"No such file or directory: {input_path}")
-
-    return [str(f) for f in files]
-
-def unravel(lst):
-	if isinstance(lst, list):
-		result = []
-		for elem in lst:
-			result.extend(unravel(elem))
-		return result
-	elif isinstance(lst, int):
-		return [lst]
-	else:
-		return []
-
 def apply_filter(file_path):
     file_name = file_path.split("/")[-1]
     index_path = FLAGS.index_dir + f"/{file_name}"
@@ -65,6 +33,10 @@ def apply_filter(file_path):
 
     if not Path(index_path).exists():
         print(f"{index_path} does not exist. Abort.")
+        return
+
+    if Path(output_path).exists():
+        print(f"{output_path} already exists. Abort.")
         return
 
     with open(index_path, 'r') as f:
