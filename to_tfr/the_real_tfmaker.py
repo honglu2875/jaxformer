@@ -20,7 +20,7 @@ flags.DEFINE_string('tokenizer_path', None, 'tokenizer path.')
 flags.DEFINE_integer('threads', 1, 'number of threads.')
 flags.DEFINE_integer('max_token', 2048, 'throw away samples with more token numbers.')
 flags.DEFINE_string('name', 'data', 'file prefix.')
-flags.DEFINE_bool('pickle_dict', True, 'pickle the result dict.')
+flags.DEFINE_bool('pickle', True, 'pickle the result.')
 
 
 def _int64_feature(value):
@@ -42,6 +42,12 @@ def write_tfrecord(sequences, file_path):
             write_to_file(writer, seq)
 
 
+def tokenize(i, lst, tokenizer):
+    res = tokenizer(lst, return_tensors='np', max_length=int(1e8), truncation=True)
+    print(f"Chunk {i} finished.")
+    return res
+
+
 def create_tfrecords(docs):
     tokenizer = AutoTokenizer.from_pretrained(FLAGS.tokenizer_path)
     
@@ -50,33 +56,22 @@ def create_tfrecords(docs):
     NUM_PROCESS = FLAGS.threads
     LEN = len(docs) // NUM_PROCESS
 
-    def tokenize(id, lst, start_idx, length, result):
-        result[id] = tokenizer(lst[start_idx:start_idx + length], return_tensors='np', max_length=int(1e8), truncation=True)
-
-
-    with mp.Manager() as manager:
-        result = manager.dict()
-        processes = []
-        for i in range(NUM_PROCESS):
-            processes.append(mp.Process(target=tokenize, args=(i, docs, i*LEN, LEN, result)))
-            processes[-1].start()
-                                                        
-        for i in range(NUM_PROCESS):
-            processes[i].join()
-        result = dict(result)
+    parallel_args = [(i, docs[i*LEN:(i+1)*LEN], tokenizer) for i in range(NUM_PROCESS)]
+    with mp.Pool(processes=NUM_PROCESS) as pool:
+        result = list(pool.starmap(tokenize, parallel_args))
 
     print("All processes finished.")
-    print(f"Payload received from processes: {result.keys()}")
     # Filtering is faster outside the multiprocessing
     all_seq = []
-    for i in result: 
-        keep_idx = np.vectorize(lambda token_list: len(token_list) < 2048)(result[i]['input_ids'])
+    is_short = np.vectorize(lambda token_list: len(token_list) < 2048)
+    for i in range(len(result)): 
+        keep_idx = is_short(result[i]['input_ids'])
         all_seq.extend(result[i]['input_ids'][keep_idx].tolist()) 
     
     total_len = len(all_seq)
     print(f"Total length of filtered data: {total_len}")
 
-    if FLAGS.pickle_dict:
+    if FLAGS.pickle:
         print("Backup the tokenized data by pickling the payload dict.")
         with open('backup.pkl', 'wb') as f:
             pickle.dump(all_seq, f)
