@@ -1,3 +1,12 @@
+"""
+This will tokenize all entries in jsonl.zst files, check the token length, 
+and return the label number of those that are less than the given number (max_token).
+
+It will generate a text file under the path specified by `output` (is a directory).
+"""
+
+
+
 from transformers import AutoTokenizer
 import tensorflow as tf
 import lm_dataformat as lmd
@@ -26,7 +35,7 @@ def tokenize(i, lst, tokenizer, offset):
     result = tokenizer(lst, return_tensors='np', max_length=int(1e8), truncation=True)
     is_short = np.vectorize(lambda token_list: len(token_list) < 2048)
 
-    keep_idx = is_short(result[i]['input_ids'])
+    keep_idx = is_short(result['input_ids'])
 
     print(f"Chunk {i} finished.")
     return (np.where(keep_idx)[0] + offset).tolist()
@@ -53,19 +62,51 @@ def filter_token_len(docs):
         f.write(str(result))
 
 
+def get_files(input_path):
+    supported_file_types = ['jsonl.zst']
+    
+    if isinstance(input_path, str):
+        input_path = Path(input_path)
+    
+    if input_path.is_dir():
+        # get all files with supported file types
+        files = [list(Path(input_path).glob(f"*{ft}")) for ft in supported_file_types]
+        # flatten list
+        files = [f for sublist in files for f in sublist]
+        assert files, f"No files with supported types found in directory: {input_path}"
+    elif input_path.is_file():
+        assert any(
+            str(input_path).endswith(f_type) for f_type in supported_file_types
+        ), f"Input file type must be one of: {supported_file_types}"
+        files = [input_path]
+    else:
+        raise FileNotFoundError(f"No such file or directory: {input_path}")
+
+    return [str(f) for f in files]
+
+
+def read_from_file(input_path):
+    reader = lmd.Reader(input_path)
+    lst = list(reader.stream_data())
+    print(f"Reading {input_path} completed.")
+    return lst
+
 
 def main(argv):
     if FLAGS.output:
         os.makedirs(FLAGS.output, exist_ok=True)
     
-    # Read the folder as a whole
-    reader = lmd.Reader(FLAGS.input)
-    # Make data a contiguous list
-    docs = list(reader.stream_data())
-
-
+    # Read the files in the folder
+    files = get_files(FLAGS.input)
+    with mp.Pool(processes=FLAGS.threads) as pool:
+        results = pool.map(read_from_file, files)
     
-    print(f"Tokenizing.")
+    # Flatten the list
+    docs = []
+    for doc in results:
+        docs.extend(doc)
+    print(f"Reading finished. Tokenizing.")
+
     filter_token_len(docs)
 
 if __name__=="__main__":
