@@ -28,34 +28,38 @@ flags.DEFINE_string('tokenizer_path', None, 'tokenizer path.')
 flags.DEFINE_integer('threads', 1, 'number of threads.')
 flags.DEFINE_integer('max_token', 2048, 'throw away samples with more token numbers.')
 flags.DEFINE_string('name', 'data', 'file prefix.')
+flags.DEFINE_bool('separate_by_file', False, 'separately process each file by different processes.')
 
 
 
 def tokenize(i, lst, tokenizer, offset):
-    result = tokenizer(lst, return_tensors='np', max_length=int(1e8), truncation=True)
-    is_short = np.vectorize(lambda token_list: len(token_list) < 2048)
-
-    keep_idx = is_short(result['input_ids'])
+    result = tokenizer(lst, return_tensors='np', max_length=int(1e8), truncation=True)['input_ids']
+    ids = []
+    for i in range(len(result)):
+        if len(result[i]) < FLAGS.max_token:
+            ids.append(i + offset)
 
     print(f"Chunk {i} finished.")
-    return (np.where(keep_idx)[0] + offset).tolist()
+    return ids
 
 
-def filter_token_len(docs):
+def filter_token_len(docs, file_path, num_workers=None, offset=0):
     tokenizer = AutoTokenizer.from_pretrained(FLAGS.tokenizer_path)
     
     os.environ['TOKENIZERS_PARALLELISM'] = 'false'
 
-    NUM_PROCESS = FLAGS.threads
+    NUM_PROCESS = FLAGS.threads if num_workers is None else num_workers
     LEN = len(docs) // NUM_PROCESS
 
-    parallel_args = [(i, docs[i*LEN:(i+1)*LEN], tokenizer, i*LEN) for i in range(NUM_PROCESS)]
-    with mp.Pool(processes=NUM_PROCESS) as pool:
-        result = list(pool.starmap(tokenize, parallel_args))
+    parallel_args = [(i, docs[i*LEN:(i+1)*LEN], tokenizer, i*LEN + offset) for i in range(NUM_PROCESS)]
+    if NUM_PROCESS == 1:
+        result = [tokenize(0, docs, tokenizer, 0)]
+    else:
+        with mp.Pool(processes=NUM_PROCESS) as pool:
+            result = list(pool.starmap(tokenize, parallel_args))
+        print("All processes finished.")
 
-    print("All processes finished.")
     
-    file_path = FLAGS.output + f"/{FLAGS.name}.txt"
     print(f"Writing to text file at {file_path}")
 
     with open(file_path, "w") as f:
@@ -86,9 +90,17 @@ def get_files(input_path):
 
 
 def read_from_file(input_path):
-    reader = lmd.Reader(input_path)
-    lst = list(reader.stream_data())
-    print(f"Reading {input_path} completed.")
+
+    if FLAGS.separate_by_file:
+        file_path = FLAGS.output + "/" + input_path.split("/")[-1] 
+        if not Path(file_path).exists():
+            reader = lmd.Reader(input_path)
+            lst = list(reader.stream_data())
+            print(f"Reading {input_path} completed.")
+            filter_token_len(lst, file_path=file_path, num_workers=1)
+        else:
+            print(f"{file_path} already exists.")
+
     return lst
 
 
@@ -101,13 +113,15 @@ def main(argv):
     with mp.Pool(processes=FLAGS.threads) as pool:
         results = pool.map(read_from_file, files)
     
-    # Flatten the list
-    docs = []
-    for doc in results:
-        docs.extend(doc)
-    print(f"Reading finished. Tokenizing.")
+    if not FLAGS.separate_by_file:
+        # Flatten the list
+        docs = []
+        for doc in results:
+            docs.extend(doc)
+        print(f"Reading finished. Tokenizing.")
 
-    filter_token_len(docs)
+        file_path = FLAGS.output + f"/{FLAGS.name}.txt"
+        filter_token_len(docs, file_path=file_path)
 
 if __name__=="__main__":
     app.run(main)
