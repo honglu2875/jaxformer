@@ -65,7 +65,7 @@ def create_tfrecords(docs):
     # Filtering is faster outside the multiprocessing
     all_seq = []
     for i in range(NUM_PROCESS): 
-        keep_idx = map(lambda token_list: len(token_list) < 2048, result[i]['input_ids'])
+        keep_idx = np.vectorize(lambda token_list: len(token_list) < 2048)(result[i]['input_ids'])
         all_seq.extend(result[i]['input_ids'][keep_idx].tolist()) 
     
     total_len = len(all_seq)
