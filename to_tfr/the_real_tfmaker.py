@@ -9,6 +9,7 @@ from random import random
 from tqdm import tqdm
 import multiprocessing as mp
 import numpy as np
+import pickle
 
 
 FLAGS = flags.FLAGS
@@ -19,6 +20,7 @@ flags.DEFINE_string('tokenizer_path', None, 'tokenizer path.')
 flags.DEFINE_integer('threads', 1, 'number of threads.')
 flags.DEFINE_integer('max_token', 2048, 'throw away samples with more token numbers.')
 flags.DEFINE_string('name', 'data', 'file prefix.')
+flags.DEFINE_bool('pickle_dict', True, 'pickle the result dict.')
 
 
 def _int64_feature(value):
@@ -63,17 +65,25 @@ def create_tfrecords(docs):
             processes[i].join()
         result = dict(result)
 
-
+    print("All processes finished.")
+    print(f"Payload received from processes: {result.keys()}")
     # Filtering is faster outside the multiprocessing
     all_seq = []
-    for i in range(NUM_PROCESS): 
+    for i in result: 
         keep_idx = np.vectorize(lambda token_list: len(token_list) < 2048)(result[i]['input_ids'])
         all_seq.extend(result[i]['input_ids'][keep_idx].tolist()) 
     
     total_len = len(all_seq)
     print(f"Total length of filtered data: {total_len}")
 
-    write_tfrecord(all_seq, FLAGS.output + f"/{FLAGS.name}_{total_len}.tfrecords")
+    if FLAGS.pickle_dict:
+        print("Backup the tokenized data by pickling the payload dict.")
+        with open('backup.pkl', 'wb') as f:
+            pickle.dump(all_seq, f)
+
+    file_path = FLAGS.output + f"/{FLAGS.name}_{total_len}.tfrecords"
+    print(f"Writing to tfrecords at {file_path}")
+    write_tfrecord(all_seq, file_path)
 
 
 
