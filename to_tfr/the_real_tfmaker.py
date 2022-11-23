@@ -13,11 +13,12 @@ import numpy as np
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string('input', None, 'The input folder for jsonl.zst.')
-flags.DEFINE_string('output', None, 'The output single file.')
+flags.DEFINE_string('output', None, 'The output directory.')
 flags.DEFINE_string('format', 'tfrecord', '[tfrecord]')
 flags.DEFINE_string('tokenizer_path', None, 'tokenizer path.')
 flags.DEFINE_integer('threads', 1, 'number of threads.')
 flags.DEFINE_integer('max_token', 2048, 'throw away samples with more token numbers.')
+flags.DEFINE_string('name', 'data', 'file prefix.')
 
 
 def _int64_feature(value):
@@ -48,7 +49,7 @@ def create_tfrecords(docs):
     LEN = len(docs) // NUM_PROCESS
 
     def tokenize(id, lst, start_idx, length, result):
-        result[i] = tokenizer(lst[start_idx:start_idx + length], return_tensors='np')
+        result[i] = tokenizer(lst[start_idx:start_idx + length], return_tensors='np', max_length=int(1e8), truncation=True)
 
 
     with mp.Manager() as manager:
@@ -72,7 +73,7 @@ def create_tfrecords(docs):
     total_len = len(all_seq)
     print(f"Total length of filtered data: {total_len}")
 
-    write_tfrecord(all_seq, FLAGS.output)
+    write_tfrecord(all_seq, FLAGS.output + f"/{FLAGS.name}_{total_len}.tfrecords")
 
 
 
