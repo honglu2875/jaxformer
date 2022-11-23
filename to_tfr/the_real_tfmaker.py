@@ -49,7 +49,7 @@ def create_tfrecords(docs):
     LEN = len(docs) // NUM_PROCESS
 
     def tokenize(id, lst, start_idx, length, result):
-        result[i] = tokenizer(lst[start_idx:start_idx + length], return_tensors='np', max_length=int(1e8), truncation=True)
+        result[id] = tokenizer(lst[start_idx:start_idx + length], return_tensors='np', max_length=int(1e8), truncation=True)
 
 
     with mp.Manager() as manager:
