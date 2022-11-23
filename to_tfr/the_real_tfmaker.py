@@ -8,6 +8,7 @@ from pathlib import Path
 from random import random
 from tqdm import tqdm
 import multiprocessing as mp
+import numpy as np
 
 
 FLAGS = flags.FLAGS
