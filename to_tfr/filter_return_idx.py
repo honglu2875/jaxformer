@@ -100,8 +100,15 @@ def read_from_file(input_path):
             filter_token_len(lst, file_path=file_path, num_workers=1)
         else:
             print(f"{file_path} already exists.")
-
-    return lst
+        
+        return None  # Let garbage collector take everything. Save memory footprint.
+    else:
+        reader = lmd.Reader(input_path)
+        lst = list(reader.stream_data())
+        print(f"Reading {input_path} completed.")
+        filter_token_len(lst, file_path=file_path, num_workers=1)
+        
+        return lst
 
 
 def main(argv):
