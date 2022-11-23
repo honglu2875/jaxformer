@@ -24,7 +24,7 @@ import pickle
 FLAGS = flags.FLAGS
 flags.DEFINE_string('input', None, 'The input folder for jsonl.zst.')
 flags.DEFINE_string('output', None, 'The output directory.')
-flags.DEFINE_string('tokenizer_path', None, 'tokenizer path.')
+flags.DEFINE_string('tokenizer_path', 'gpt2', 'tokenizer path.')
 flags.DEFINE_integer('threads', 1, 'number of threads.')
 flags.DEFINE_integer('max_token', 2048, 'throw away samples with more token numbers.')
 flags.DEFINE_string('name', 'data', 'file prefix.')
@@ -91,8 +91,9 @@ def get_files(input_path):
 
 def read_from_file(input_path):
 
+    file_path = FLAGS.output + "/" + input_path.split("/")[-1] 
+    
     if FLAGS.separate_by_file:
-        file_path = FLAGS.output + "/" + input_path.split("/")[-1] 
         if not Path(file_path).exists():
             reader = lmd.Reader(input_path)
             lst = list(reader.stream_data())
@@ -114,7 +115,7 @@ def read_from_file(input_path):
 def main(argv):
     if FLAGS.output:
         os.makedirs(FLAGS.output, exist_ok=True)
-    
+
     # Read the files in the folder
     files = get_files(FLAGS.input)
     with mp.Pool(processes=FLAGS.threads) as pool:
