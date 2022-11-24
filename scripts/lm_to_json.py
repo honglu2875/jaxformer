@@ -4,7 +4,7 @@ from absl import app
 import os
 import multiprocessing as mp
 from util import get_files
-from dataset import Dataset
+from datasets import Dataset
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string('input', None, 'The input dir.')
@@ -26,8 +26,9 @@ def main(argv):
         os.makedirs(FLAGS.output, exist_ok=True)
 
     files = get_files(FLAGS.input)
+    print(f"{len(files)} files.")
     with mp.Pool(processes=FLAGS.threads) as pool:
-        results = pool.map(read_from_file, files)
+        results = list(pool.map(read_from_file, files))
 
     docs = []
     for doc in results:
@@ -36,4 +37,6 @@ def main(argv):
     dataset = Dataset.from_list([{'text': s} for s in docs])
     dataset.to_json(FLAGS.output + "/" + FLAGS.filename)
 
-    
+   
+if __name__=='__main__':
+    app.run(main)
