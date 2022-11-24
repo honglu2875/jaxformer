@@ -29,18 +29,25 @@ flags.DEFINE_integer('threads', 1, 'number of threads.')
 flags.DEFINE_integer('max_token', 2048, 'throw away samples with more token numbers.')
 flags.DEFINE_string('name', 'data', 'file prefix.')
 flags.DEFINE_bool('separate_by_file', False, 'separately process each file by different processes.')
+flags.DEFINE_integer('max_sample_per_call', 1_000_000, 'maximal number of samples to tokenize in each tokenizer call.')
 
 
 
-def tokenize(i, lst, tokenizer, offset):
-    result = tokenizer(lst, return_tensors='np', max_length=int(1e8), truncation=True)['input_ids']
+def tokenize(thread_id, lst, tokenizer, offset):
+    NUM = FLAGS.max_sample_per_call
+    LEN = (len(lst)-1) // NUM + 1
+
     ids = []
-    for i in range(len(result)):
-        if len(result[i]) < FLAGS.max_token:
-            ids.append(i + offset)
+    for i in range(LEN):
+        chunk = lst[i*NUM: (i + 1) * NUM]
+        result = tokenizer(chunk, return_tensors='np', max_length=int(1e8), truncation=True)['input_ids']
+        for j in range(len(result)):
+            if len(result[j]) < FLAGS.max_token:
+                ids.append(j + offset)
 
-    print(f"Chunk {i} finished.")
-    return ids
+        del result
+        print(f"Worker {thread_id}: Chunk {i} finished.")
+        return ids
 
 
 def filter_token_len(docs, file_path, num_workers=None, offset=0):
@@ -107,7 +114,6 @@ def read_from_file(input_path):
         reader = lmd.Reader(input_path)
         lst = list(reader.stream_data())
         print(f"Reading {input_path} completed.")
-        filter_token_len(lst, file_path=file_path, num_workers=1)
         
         return lst
 
