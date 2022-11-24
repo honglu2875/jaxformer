@@ -19,6 +19,11 @@ from tqdm import tqdm
 import multiprocessing as mp
 import numpy as np
 import pickle
+import logging
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+logger.addHandler(logging.StreamHandler())
 
 
 FLAGS = flags.FLAGS
@@ -29,7 +34,7 @@ flags.DEFINE_integer('threads', 1, 'number of threads.')
 flags.DEFINE_integer('max_token', 2048, 'throw away samples with more token numbers.')
 flags.DEFINE_string('name', 'data', 'file prefix.')
 flags.DEFINE_bool('separate_by_file', False, 'separately process each file by different processes.')
-flags.DEFINE_integer('max_sample_per_call', 1_000_000, 'maximal number of samples to tokenize in each tokenizer call.')
+flags.DEFINE_integer('max_sample_per_call', 100_000, 'maximal number of samples to tokenize in each tokenizer call.')
 
 
 
@@ -46,7 +51,7 @@ def tokenize(thread_id, lst, tokenizer, offset):
                 ids.append(j + offset)
 
         del result
-        print(f"Worker {thread_id}: Chunk {i} finished.")
+        logger.info(f"Worker {thread_id}: Chunk {i} finished.")
         return ids
 
 
@@ -64,10 +69,10 @@ def filter_token_len(docs, file_path, num_workers=None, offset=0):
     else:
         with mp.Pool(processes=NUM_PROCESS) as pool:
             result = list(pool.starmap(tokenize, parallel_args))
-        print("All processes finished.")
+        logger.info("All processes finished.")
 
     
-    print(f"Writing to text file at {file_path}")
+    logger.info(f"Writing to text file at {file_path}")
 
     with open(file_path, "w") as f:
         f.write(str(result))
@@ -104,16 +109,16 @@ def read_from_file(input_path):
         if not Path(file_path).exists():
             reader = lmd.Reader(input_path)
             lst = list(reader.stream_data())
-            print(f"Reading {input_path} completed.")
+            logger.info(f"Reading {input_path} completed.")
             filter_token_len(lst, file_path=file_path, num_workers=1)
         else:
-            print(f"{file_path} already exists.")
+            logger.info(f"{file_path} already exists.")
         
         return None  # Let garbage collector take everything. Save memory footprint.
     else:
         reader = lmd.Reader(input_path)
         lst = list(reader.stream_data())
-        print(f"Reading {input_path} completed.")
+        logger.info(f"Reading {input_path} completed.")
         
         return lst
 
@@ -121,7 +126,9 @@ def read_from_file(input_path):
 def main(argv):
     if FLAGS.output:
         os.makedirs(FLAGS.output, exist_ok=True)
-
+    
+    logger.info("Started.")
+    
     # Read the files in the folder
     files = get_files(FLAGS.input)
     with mp.Pool(processes=FLAGS.threads) as pool:
@@ -132,7 +139,7 @@ def main(argv):
         docs = []
         for doc in results:
             docs.extend(doc)
-        print(f"Reading finished. Tokenizing.")
+        logger.info(f"Reading finished. Tokenizing.")
 
         file_path = FLAGS.output + f"/{FLAGS.name}.txt"
         filter_token_len(docs, file_path=file_path)
